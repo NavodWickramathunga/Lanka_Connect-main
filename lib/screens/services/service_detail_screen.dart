@@ -17,17 +17,27 @@ class ServiceDetailScreen extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    await FirestoreRefs.bookings().add({
-      'serviceId': serviceId,
-      'providerId': providerId,
-      'seekerId': user.uid,
-      'status': 'pending',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await FirestoreRefs.bookings().add({
+        'serviceId': serviceId,
+        'providerId': providerId,
+        'seekerId': user.uid,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Booking request sent.')));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Booking request sent.')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error creating booking: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _createRequest(
@@ -38,17 +48,27 @@ class ServiceDetailScreen extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    await FirestoreRefs.requests().add({
-      'serviceId': serviceId,
-      'providerId': providerId,
-      'seekerId': user.uid,
-      'status': 'pending',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await FirestoreRefs.requests().add({
+        'serviceId': serviceId,
+        'providerId': providerId,
+        'seekerId': user.uid,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Service request created.')));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Service request created.')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error creating request: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -96,11 +116,14 @@ class ServiceDetailScreen extends StatelessWidget {
                     if (reviews.isEmpty) {
                       return const Text('No reviews yet.');
                     }
-                    final avg =
-                        reviews
-                            .map((doc) => (doc.data()['rating'] ?? 0) as int)
-                            .fold<int>(0, (sum, item) => sum + item) /
-                        reviews.length;
+                    final ratings = reviews
+                        .map((doc) => (doc.data()['rating'] ?? 0) as int)
+                        .toList();
+                    if (ratings.isEmpty) {
+                      return const Text('No reviews yet.');
+                    }
+                    final avg = ratings.fold<int>(0, (sum, item) => sum + item) /
+                        ratings.length;
                     return Text('Average rating: ${avg.toStringAsFixed(1)}');
                   },
                 ),

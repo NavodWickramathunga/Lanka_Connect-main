@@ -10,7 +10,13 @@ class BookingListScreen extends StatelessWidget {
   const BookingListScreen({super.key});
 
   Future<void> _updateStatus(String bookingId, String status) async {
-    await FirestoreRefs.bookings().doc(bookingId).update({'status': status});
+    try {
+      await FirestoreRefs.bookings().doc(bookingId).update({'status': status});
+    } catch (e) {
+      // Error will be silently caught as there's no BuildContext here
+      // In a production app, you might want to use a state management solution
+      rethrow;
+    }
   }
 
   @override
@@ -50,14 +56,15 @@ class BookingListScreen extends StatelessWidget {
               itemBuilder: (context, index) {
                 final doc = docs[index];
                 final data = doc.data();
-                final status = (data['status'] ?? 'pending').toString();
+                final status = data['status']?.toString() ?? 'pending';
+                final serviceId = data['serviceId']?.toString() ?? 'Unknown';
                 return Card(
                   margin: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 6,
                   ),
                   child: ListTile(
-                    title: Text('Service: ${data['serviceId']}'),
+                    title: Text('Service: $serviceId'),
                     subtitle: Text('Status: $status'),
                     trailing: Wrap(
                       spacing: 6,

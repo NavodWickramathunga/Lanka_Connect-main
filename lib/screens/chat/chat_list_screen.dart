@@ -45,9 +45,13 @@ class ChatListScreen extends StatelessWidget {
               itemBuilder: (context, index) {
                 final doc = docs[index];
                 final data = doc.data();
+                final status = data['status']?.toString() ?? 'Unknown';
+                final bookingId = doc.id.length > 6 
+                    ? doc.id.substring(0, 6) 
+                    : doc.id;
                 return ListTile(
-                  title: Text('Booking ${doc.id.substring(0, 6)}'),
-                  subtitle: Text('Status: ${data['status'] ?? ''}'),
+                  title: Text('Booking $bookingId'),
+                  subtitle: Text('Status: $status'),
                   trailing: const Icon(Icons.chat_bubble_outline),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
