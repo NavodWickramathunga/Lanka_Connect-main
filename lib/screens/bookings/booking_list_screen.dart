@@ -10,13 +10,8 @@ class BookingListScreen extends StatelessWidget {
   const BookingListScreen({super.key});
 
   Future<void> _updateStatus(String bookingId, String status) async {
-    try {
-      await FirestoreRefs.bookings().doc(bookingId).update({'status': status});
-    } catch (e) {
-      // Error will be silently caught as there's no BuildContext here
-      // In a production app, you might want to use a state management solution
-      rethrow;
-    }
+    // TODO: Add proper error handling with BuildContext via callback or state management
+    await FirestoreRefs.bookings().doc(bookingId).update({'status': status});
   }
 
   @override

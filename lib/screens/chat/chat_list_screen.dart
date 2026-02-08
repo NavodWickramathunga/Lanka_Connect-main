@@ -8,6 +8,8 @@ import 'chat_screen.dart';
 class ChatListScreen extends StatelessWidget {
   const ChatListScreen({super.key});
 
+  static const int _bookingIdDisplayLength = 6;
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -46,8 +48,8 @@ class ChatListScreen extends StatelessWidget {
                 final doc = docs[index];
                 final data = doc.data();
                 final status = data['status']?.toString() ?? 'Unknown';
-                final bookingId = doc.id.length > 6 
-                    ? doc.id.substring(0, 6) 
+                final bookingId = doc.id.length > _bookingIdDisplayLength
+                    ? doc.id.substring(0, _bookingIdDisplayLength)
                     : doc.id;
                 return ListTile(
                   title: Text('Booking $bookingId'),

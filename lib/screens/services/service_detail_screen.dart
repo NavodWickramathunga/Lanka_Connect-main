@@ -119,9 +119,6 @@ class ServiceDetailScreen extends StatelessWidget {
                     final ratings = reviews
                         .map((doc) => (doc.data()['rating'] ?? 0) as int)
                         .toList();
-                    if (ratings.isEmpty) {
-                      return const Text('No reviews yet.');
-                    }
                     final avg = ratings.fold<int>(0, (sum, item) => sum + item) /
                         ratings.length;
                     return Text('Average rating: ${avg.toStringAsFixed(1)}');

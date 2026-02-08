@@ -119,7 +119,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _imageUrl = url;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Image uploaded successfully!')),
