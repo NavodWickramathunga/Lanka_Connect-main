@@ -6,7 +6,13 @@ class AdminServicesScreen extends StatelessWidget {
   const AdminServicesScreen({super.key});
 
   Future<void> _updateStatus(String serviceId, String status) async {
-    await FirestoreRefs.services().doc(serviceId).update({'status': status});
+    try {
+      await FirestoreRefs.services().doc(serviceId).update({'status': status});
+    } catch (e) {
+      // Error will be silently caught as there's no BuildContext here
+      // In a production app, you might want to use a state management solution
+      rethrow;
+    }
   }
 
   @override

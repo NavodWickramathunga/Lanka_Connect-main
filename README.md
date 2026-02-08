@@ -6,6 +6,9 @@ A new Flutter project with Firebase integration.
 
 ⚠️ **Important**: Before running this app, you must configure Firebase for iOS and Android.
 
+**Note:** The `lib/firebase_options.dart` file is gitignored for security reasons (contains API keys). 
+You need to generate it using one of the methods below.
+
 See [FIREBASE_SETUP.md](FIREBASE_SETUP.md) for detailed setup instructions.
 
 ### Quick Setup
@@ -15,7 +18,7 @@ See [FIREBASE_SETUP.md](FIREBASE_SETUP.md) for detailed setup instructions.
    dart pub global activate flutterfire_cli
    ```
 
-2. Configure Firebase:
+2. Configure Firebase (this will create the required firebase_options.dart file):
    ```bash
    firebase login
    flutterfire configure --project=lankaconnect-app
@@ -26,6 +29,15 @@ See [FIREBASE_SETUP.md](FIREBASE_SETUP.md) for detailed setup instructions.
    flutter pub get
    flutter run
    ```
+
+### Alternative Manual Setup
+
+If FlutterFire CLI doesn't work, you can manually copy the template:
+
+```bash
+cp .firebase_templates/firebase_options.dart lib/
+# Then edit lib/firebase_options.dart and replace placeholder values with your actual Firebase credentials
+```
 
 ## Getting Started
 
