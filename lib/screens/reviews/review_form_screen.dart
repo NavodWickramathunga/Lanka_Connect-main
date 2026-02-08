@@ -43,18 +43,32 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
       _saving = true;
     });
 
-    await FirestoreRefs.reviews().add({
-      'bookingId': widget.bookingId,
-      'serviceId': widget.serviceId,
-      'providerId': widget.providerId,
-      'reviewerId': user.uid,
-      'rating': _rating,
-      'comment': _commentController.text.trim(),
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await FirestoreRefs.reviews().add({
+        'bookingId': widget.bookingId,
+        'serviceId': widget.serviceId,
+        'providerId': widget.providerId,
+        'reviewerId': user.uid,
+        'rating': _rating,
+        'comment': _commentController.text.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
 
-    if (mounted) {
-      Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Review submitted successfully!')),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error submitting review: $e')),
+        );
+      }
     }
   }
 

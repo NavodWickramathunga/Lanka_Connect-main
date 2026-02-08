@@ -53,60 +53,85 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _saving = true;
     });
 
-    final skills = _skillsController.text
-        .split(',')
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toList();
+    try {
+      final skills = _skillsController.text
+          .split(',')
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
 
-    await FirestoreRefs.users().doc(user.uid).set(
-      {
-        'name': _nameController.text.trim(),
-        'contact': _contactController.text.trim(),
-        'district': _districtController.text.trim(),
-        'city': _cityController.text.trim(),
-        'skills': skills,
-        'bio': _bioController.text.trim(),
-        'imageUrl': _imageUrl,
-        'updatedAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
-
-    if (mounted) {
-      setState(() {
-        _saving = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile saved.')),
+      await FirestoreRefs.users().doc(user.uid).set(
+        {
+          'name': _nameController.text.trim(),
+          'contact': _contactController.text.trim(),
+          'district': _districtController.text.trim(),
+          'city': _cityController.text.trim(),
+          'skills': skills,
+          'bio': _bioController.text.trim(),
+          'imageUrl': _imageUrl,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
       );
+
+      if (mounted) {
+        setState(() {
+          _saving = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile saved.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving profile: $e')),
+        );
+      }
     }
   }
 
   Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
-    if (picked == null) return;
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: ImageSource.gallery);
+      if (picked == null) return;
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
 
-    final ref = FirebaseStorage.instance
-        .ref()
-        .child('profile_images')
-        .child('${user.uid}.jpg');
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('profile_images')
+          .child('${user.uid}.jpg');
 
-    if (kIsWeb) {
-      final bytes = await picked.readAsBytes();
-      await ref.putData(bytes);
-    } else {
-      await ref.putFile(File(picked.path));
+      if (kIsWeb) {
+        final bytes = await picked.readAsBytes();
+        await ref.putData(bytes);
+      } else {
+        await ref.putFile(File(picked.path));
+      }
+
+      final url = await ref.getDownloadURL();
+      setState(() {
+        _imageUrl = url;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image uploaded successfully!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading image: $e')),
+        );
+      }
     }
-
-    final url = await ref.getDownloadURL();
-    setState(() {
-      _imageUrl = url;
-    });
   }
 
   void _hydrateFields(Map<String, dynamic> data) {
@@ -178,7 +203,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   controller: _contactController,
                   decoration: const InputDecoration(labelText: 'Contact'),
                   validator: (value) =>
-                      Validators.requiredField(value, 'Contact required'),
+                      Validators.phoneField(value),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(

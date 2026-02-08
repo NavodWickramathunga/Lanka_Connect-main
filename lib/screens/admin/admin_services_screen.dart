@@ -6,6 +6,7 @@ class AdminServicesScreen extends StatelessWidget {
   const AdminServicesScreen({super.key});
 
   Future<void> _updateStatus(String serviceId, String status) async {
+    // TODO: Add proper error handling with BuildContext via callback or state management
     await FirestoreRefs.services().doc(serviceId).update({'status': status});
   }
 

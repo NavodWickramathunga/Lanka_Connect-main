@@ -42,19 +42,33 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
       _saving = true;
     });
 
-    await FirestoreRefs.services().add({
-      'providerId': user.uid,
-      'title': _titleController.text.trim(),
-      'category': _categoryController.text.trim(),
-      'price': double.tryParse(_priceController.text.trim()) ?? 0,
-      'location': _locationController.text.trim(),
-      'description': _descriptionController.text.trim(),
-      'status': 'pending',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await FirestoreRefs.services().add({
+        'providerId': user.uid,
+        'title': _titleController.text.trim(),
+        'category': _categoryController.text.trim(),
+        'price': double.tryParse(_priceController.text.trim()) ?? 0,
+        'location': _locationController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
 
-    if (mounted) {
-      Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Service posted successfully!')),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error posting service: $e')),
+        );
+      }
     }
   }
 
@@ -87,7 +101,7 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                 decoration: const InputDecoration(labelText: 'Price (LKR)'),
                 keyboardType: TextInputType.number,
                 validator: (value) =>
-                    Validators.numberField(value, 'Price required'),
+                    Validators.priceField(value, 'Price required'),
               ),
               const SizedBox(height: 12),
               TextFormField(

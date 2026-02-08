@@ -28,14 +28,22 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    await FirestoreRefs.messages().add({
-      'chatId': widget.chatId,
-      'senderId': user.uid,
-      'text': text,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await FirestoreRefs.messages().add({
+        'chatId': widget.chatId,
+        'senderId': user.uid,
+        'text': text,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
 
-    _messageController.clear();
+      _messageController.clear();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sending message: $e')),
+        );
+      }
+    }
   }
 
   @override
