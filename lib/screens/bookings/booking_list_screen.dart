@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../utils/firestore_refs.dart';
+import '../../utils/firestore_error_handler.dart';
 import '../../utils/user_roles.dart';
 import '../chat/chat_screen.dart';
 import '../reviews/review_form_screen.dart';
@@ -9,9 +10,36 @@ import '../reviews/review_form_screen.dart';
 class BookingListScreen extends StatelessWidget {
   const BookingListScreen({super.key});
 
-  Future<void> _updateStatus(String bookingId, String status) async {
-    // TODO: Add proper error handling with BuildContext via callback or state management
-    await FirestoreRefs.bookings().doc(bookingId).update({'status': status});
+  Future<void> _updateStatus(
+    BuildContext context,
+    String bookingId,
+    String status,
+  ) async {
+    try {
+      await FirestoreRefs.bookings().doc(bookingId).update({'status': status});
+    } on FirebaseException catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'bookings_update_status',
+        error: e,
+        stackTrace: st,
+        details: {'bookingId': bookingId, 'status': status},
+      );
+      FirestoreErrorHandler.showError(
+        context,
+        FirestoreErrorHandler.toUserMessage(e),
+      );
+    } catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'bookings_update_status_unknown',
+        error: e,
+        stackTrace: st,
+        details: {'bookingId': bookingId, 'status': status},
+      );
+      FirestoreErrorHandler.showError(
+        context,
+        FirestoreErrorHandler.toUserMessage(e),
+      );
+    }
   }
 
   @override
@@ -74,17 +102,20 @@ class BookingListScreen extends StatelessWidget {
                         ),
                         if (role == UserRoles.provider && status == 'pending')
                           TextButton(
-                            onPressed: () => _updateStatus(doc.id, 'accepted'),
+                            onPressed: () =>
+                                _updateStatus(context, doc.id, 'accepted'),
                             child: const Text('Accept'),
                           ),
                         if (role == UserRoles.provider && status == 'pending')
                           TextButton(
-                            onPressed: () => _updateStatus(doc.id, 'rejected'),
+                            onPressed: () =>
+                                _updateStatus(context, doc.id, 'rejected'),
                             child: const Text('Reject'),
                           ),
                         if (role == UserRoles.provider && status == 'accepted')
                           TextButton(
-                            onPressed: () => _updateStatus(doc.id, 'completed'),
+                            onPressed: () =>
+                                _updateStatus(context, doc.id, 'completed'),
                             child: const Text('Complete'),
                           ),
                         if (role == UserRoles.seeker && status == 'completed')
@@ -93,9 +124,10 @@ class BookingListScreen extends StatelessWidget {
                               MaterialPageRoute(
                                 builder: (_) => ReviewFormScreen(
                                   bookingId: doc.id,
-                                  serviceId: (data['serviceId'] ?? '').toString(),
-                                  providerId:
-                                      (data['providerId'] ?? '').toString(),
+                                  serviceId: (data['serviceId'] ?? '')
+                                      .toString(),
+                                  providerId: (data['providerId'] ?? '')
+                                      .toString(),
                                 ),
                               ),
                             ),

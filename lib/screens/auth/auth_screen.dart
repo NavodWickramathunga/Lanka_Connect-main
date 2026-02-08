@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../utils/firestore_refs.dart';
+import '../../utils/firestore_error_handler.dart';
 import '../../utils/user_roles.dart';
 import '../../utils/validators.dart';
 
@@ -47,38 +48,38 @@ class _AuthScreenState extends State<AuthScreen> {
       } else {
         final credential = await FirebaseAuth.instance
             .createUserWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
+              email: _emailController.text.trim(),
+              password: _passwordController.text,
+            );
         await _createUserProfile(credential.user);
       }
-    } on FirebaseAuthException catch (e) {
-      String errorMessage;
-      switch (e.code) {
-        case 'weak-password':
-          errorMessage = 'The password provided is too weak.';
-          break;
-        case 'email-already-in-use':
-          errorMessage = 'An account already exists for this email.';
-          break;
-        case 'invalid-email':
-          errorMessage = 'The email address is not valid.';
-          break;
-        case 'user-not-found':
-          errorMessage = 'No user found with this email.';
-          break;
-        case 'wrong-password':
-          errorMessage = 'Incorrect password.';
-          break;
-        default:
-          errorMessage = e.message ?? 'Authentication failed';
-      }
+    } on FirebaseAuthException catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'auth_submit',
+        error: e,
+        stackTrace: st,
+        details: {'isLogin': _isLogin, 'email': _emailController.text.trim()},
+      );
       setState(() {
-        _error = errorMessage;
+        _error = FirestoreErrorHandler.toUserMessage(e);
       });
-    } catch (e) {
+    } on FirebaseException catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'auth_profile_write',
+        error: e,
+        stackTrace: st,
+      );
       setState(() {
-        _error = 'Something went wrong. Please try again.';
+        _error = FirestoreErrorHandler.toUserMessage(e);
+      });
+    } catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'auth_submit_unknown',
+        error: e,
+        stackTrace: st,
+      );
+      setState(() {
+        _error = FirestoreErrorHandler.toUserMessage(e);
       });
     } finally {
       if (mounted) {
@@ -90,7 +91,12 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _createUserProfile(User? user) async {
-    if (user == null) return;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'user-not-available',
+        message: 'Authenticated user not found.',
+      );
+    }
 
     final doc = FirestoreRefs.users().doc(user.uid);
     final data = {
@@ -104,15 +110,23 @@ class _AuthScreenState extends State<AuthScreen> {
       'imageUrl': '',
       'createdAt': FieldValue.serverTimestamp(),
     };
-    await doc.set(data, SetOptions(merge: true));
+    try {
+      await doc.set(data, SetOptions(merge: true));
+    } on FirebaseException catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'users_set_signup_profile',
+        error: e,
+        stackTrace: st,
+        details: {'uid': user.uid},
+      );
+      rethrow;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isLogin ? 'Login' : 'Sign Up'),
-      ),
+      appBar: AppBar(title: Text(_isLogin ? 'Login' : 'Sign Up')),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -157,24 +171,24 @@ class _AuthScreenState extends State<AuthScreen> {
                           _role = value;
                         });
                       },
-                      decoration:
-                          const InputDecoration(labelText: 'Select role'),
+                      decoration: const InputDecoration(
+                        labelText: 'Select role',
+                      ),
                     ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
-                    Text(
-                      _error!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
+                    Text(_error!, style: const TextStyle(color: Colors.red)),
                   ],
                   const SizedBox(height: 20),
                   ElevatedButton(
                     onPressed: _loading ? null : _submit,
-                    child: Text(_loading
-                        ? 'Please wait...'
-                        : _isLogin
-                            ? 'Login'
-                            : 'Create account'),
+                    child: Text(
+                      _loading
+                          ? 'Please wait...'
+                          : _isLogin
+                          ? 'Login'
+                          : 'Create account',
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextButton(
@@ -186,9 +200,11 @@ class _AuthScreenState extends State<AuthScreen> {
                               _error = null;
                             });
                           },
-                    child: Text(_isLogin
-                        ? 'Need an account? Sign up'
-                        : 'Already have an account? Login'),
+                    child: Text(
+                      _isLogin
+                          ? 'Need an account? Sign up'
+                          : 'Already have an account? Login',
+                    ),
                   ),
                 ],
               ),

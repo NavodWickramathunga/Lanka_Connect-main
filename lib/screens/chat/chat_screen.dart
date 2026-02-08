@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../utils/firestore_refs.dart';
+import '../../utils/firestore_error_handler.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key, required this.chatId});
@@ -23,7 +24,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _sendMessage() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      FirestoreErrorHandler.showSignInRequired(context);
+      return;
+    }
 
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
@@ -37,12 +41,28 @@ class _ChatScreenState extends State<ChatScreen> {
       });
 
       _messageController.clear();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error sending message: $e')),
-        );
-      }
+    } on FirebaseException catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'messages_add',
+        error: e,
+        stackTrace: st,
+        details: {'uid': user.uid, 'chatId': widget.chatId},
+      );
+      FirestoreErrorHandler.showError(
+        context,
+        FirestoreErrorHandler.toUserMessage(e),
+      );
+    } catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'messages_add_unknown',
+        error: e,
+        stackTrace: st,
+        details: {'uid': user.uid, 'chatId': widget.chatId},
+      );
+      FirestoreErrorHandler.showError(
+        context,
+        FirestoreErrorHandler.toUserMessage(e),
+      );
     }
   }
 
@@ -79,8 +99,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     final data = docs[index].data();
                     final isMine = data['senderId'] == user.uid;
                     return Align(
-                      alignment:
-                          isMine ? Alignment.centerRight : Alignment.centerLeft,
+                      alignment: isMine
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
                       child: Container(
                         margin: const EdgeInsets.symmetric(
                           horizontal: 12,

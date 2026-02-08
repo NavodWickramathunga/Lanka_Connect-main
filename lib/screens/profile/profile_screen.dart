@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../utils/firestore_refs.dart';
+import '../../utils/firestore_error_handler.dart';
 import '../../utils/user_roles.dart';
 import '../../utils/validators.dart';
 
@@ -44,7 +45,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _saveProfile() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      FirestoreErrorHandler.showSignInRequired(context);
+      return;
+    }
 
     final form = _formKey.currentState;
     if (form == null || !form.validate()) return;
@@ -53,43 +57,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _saving = true;
     });
 
-    try {
-      final skills = _skillsController.text
-          .split(',')
-          .map((item) => item.trim())
-          .where((item) => item.isNotEmpty)
-          .toList();
+    final skills = _skillsController.text
+        .split(',')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
 
-      await FirestoreRefs.users().doc(user.uid).set(
-        {
-          'name': _nameController.text.trim(),
-          'contact': _contactController.text.trim(),
-          'district': _districtController.text.trim(),
-          'city': _cityController.text.trim(),
-          'skills': skills,
-          'bio': _bioController.text.trim(),
-          'imageUrl': _imageUrl,
-          'updatedAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
+    try {
+      await FirestoreRefs.users().doc(user.uid).set({
+        'name': _nameController.text.trim(),
+        'contact': _contactController.text.trim(),
+        'district': _districtController.text.trim(),
+        'city': _cityController.text.trim(),
+        'skills': skills,
+        'bio': _bioController.text.trim(),
+        'imageUrl': _imageUrl,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
       if (mounted) {
-        setState(() {
-          _saving = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile saved.')),
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Profile saved.')));
+      }
+    } on FirebaseException catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'users_set_profile',
+        error: e,
+        stackTrace: st,
+        details: {'uid': user.uid},
+      );
+      if (mounted) {
+        FirestoreErrorHandler.showError(
+          context,
+          FirestoreErrorHandler.toUserMessage(e),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'users_set_profile_unknown',
+        error: e,
+        stackTrace: st,
+        details: {'uid': user.uid},
+      );
+      if (mounted) {
+        FirestoreErrorHandler.showError(
+          context,
+          FirestoreErrorHandler.toUserMessage(e),
+        );
+      }
+    } finally {
       if (mounted) {
         setState(() {
           _saving = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving profile: $e')),
-        );
       }
     }
   }
@@ -101,12 +122,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (picked == null) return;
 
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
+      if (user == null) {
+        FirestoreErrorHandler.showSignInRequired(context);
+        return;
+      }
 
       final ref = FirebaseStorage.instance
           .ref()
           .child('profile_images')
-          .child('${user.uid}.jpg');
+          .child(user.uid)
+          .child('avatar.jpg');
 
       if (kIsWeb) {
         final bytes = await picked.readAsBytes();
@@ -127,9 +152,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading image: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error uploading image: $e')));
       }
     }
   }
@@ -145,6 +170,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final skills = List<String>.from(data['skills'] ?? const []);
     _skillsController.text = skills.join(', ');
+  }
+
+  String _roleLabel(String role) {
+    if (role == UserRoles.provider) return 'Provider';
+    if (role == UserRoles.admin) return 'Admin';
+    return 'Seeker';
   }
 
   @override
@@ -174,14 +205,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Signed in as: ${_roleLabel(_role)}'),
+                        const SizedBox(height: 4),
+                        Text('Email: ${user.email ?? 'No email'}'),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     CircleAvatar(
                       radius: 36,
-                      backgroundImage:
-                          _imageUrl.isNotEmpty ? NetworkImage(_imageUrl) : null,
-                      child:
-                          _imageUrl.isEmpty ? const Icon(Icons.person) : null,
+                      backgroundImage: _imageUrl.isNotEmpty
+                          ? NetworkImage(_imageUrl)
+                          : null,
+                      child: _imageUrl.isEmpty
+                          ? const Icon(Icons.person)
+                          : null,
                     ),
                     const SizedBox(width: 16),
                     ElevatedButton.icon(
@@ -202,8 +249,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 TextFormField(
                   controller: _contactController,
                   decoration: const InputDecoration(labelText: 'Contact'),
-                  validator: (value) =>
-                      Validators.phoneField(value),
+                  validator: (value) => Validators.phoneField(value),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(

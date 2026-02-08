@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../utils/firestore_refs.dart';
+import '../../utils/firestore_error_handler.dart';
 import '../../utils/validators.dart';
 
 class ReviewFormScreen extends StatefulWidget {
@@ -34,7 +35,10 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
 
   Future<void> _submit() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      FirestoreErrorHandler.showSignInRequired(context);
+      return;
+    }
 
     final form = _formKey.currentState;
     if (form == null || !form.validate()) return;
@@ -43,6 +47,7 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
       _saving = true;
     });
 
+    var saved = false;
     try {
       await FirestoreRefs.reviews().add({
         'bookingId': widget.bookingId,
@@ -53,22 +58,51 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
         'comment': _commentController.text.trim(),
         'createdAt': FieldValue.serverTimestamp(),
       });
-
+      saved = true;
+    } on FirebaseException catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'reviews_add',
+        error: e,
+        stackTrace: st,
+        details: {
+          'uid': user.uid,
+          'bookingId': widget.bookingId,
+          'serviceId': widget.serviceId,
+        },
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Review submitted successfully!')),
+        FirestoreErrorHandler.showError(
+          context,
+          FirestoreErrorHandler.toUserMessage(e),
         );
-        Navigator.of(context).pop();
       }
-    } catch (e) {
+    } catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'reviews_add_unknown',
+        error: e,
+        stackTrace: st,
+        details: {
+          'uid': user.uid,
+          'bookingId': widget.bookingId,
+          'serviceId': widget.serviceId,
+        },
+      );
+      if (mounted) {
+        FirestoreErrorHandler.showError(
+          context,
+          FirestoreErrorHandler.toUserMessage(e),
+        );
+      }
+    } finally {
       if (mounted) {
         setState(() {
           _saving = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error submitting review: $e')),
-        );
       }
+    }
+
+    if (saved && mounted) {
+      Navigator.of(context).pop();
     }
   }
 

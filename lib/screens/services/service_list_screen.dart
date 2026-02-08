@@ -16,19 +16,23 @@ class ServiceListScreen extends StatefulWidget {
 
 class _ServiceListScreenState extends State<ServiceListScreen> {
   final _categoryController = TextEditingController();
-  final _locationController = TextEditingController();
+  final _districtController = TextEditingController();
+  final _cityController = TextEditingController();
   final _minPriceController = TextEditingController();
   final _maxPriceController = TextEditingController();
 
   String _category = '';
-  String _location = '';
+  String _district = '';
+  String _city = '';
+  bool _nearMe = false;
   double? _minPrice;
   double? _maxPrice;
 
   @override
   void dispose() {
     _categoryController.dispose();
-    _locationController.dispose();
+    _districtController.dispose();
+    _cityController.dispose();
     _minPriceController.dispose();
     _maxPriceController.dispose();
     super.dispose();
@@ -37,7 +41,8 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
   void _applyFilters() {
     setState(() {
       _category = _categoryController.text.trim();
-      _location = _locationController.text.trim();
+      _district = _districtController.text.trim();
+      _city = _cityController.text.trim();
       _minPrice = double.tryParse(_minPriceController.text.trim());
       _maxPrice = double.tryParse(_maxPriceController.text.trim());
     });
@@ -52,23 +57,73 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
       query = query.where('status', isEqualTo: 'approved');
     }
 
-    if (_category.isNotEmpty) {
-      query = query.where('category', isEqualTo: _category);
-    }
+    return query.orderBy('createdAt', descending: true);
+  }
 
-    if (_location.isNotEmpty) {
-      query = query.where('location', isEqualTo: _location);
-    }
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _applyClientFilters(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs, {
+    required String userDistrict,
+    required String userCity,
+  }) {
+    final effectiveDistrict = _nearMe ? userDistrict : _district;
+    final effectiveCity = _nearMe ? userCity : _city;
 
-    if (_minPrice != null) {
-      query = query.where('price', isGreaterThanOrEqualTo: _minPrice);
-    }
+    final normalizedCategory = _category.toLowerCase();
+    final normalizedDistrict = effectiveDistrict.toLowerCase();
+    final normalizedCity = effectiveCity.toLowerCase();
 
-    if (_maxPrice != null) {
-      query = query.where('price', isLessThanOrEqualTo: _maxPrice);
-    }
+    var filtered = docs.where((doc) {
+      final data = doc.data();
+      final category = (data['category'] ?? '').toString().toLowerCase();
+      final district = (data['district'] ?? '').toString().toLowerCase();
+      final city = (data['city'] ?? '').toString().toLowerCase();
+      final price = (data['price'] is num)
+          ? (data['price'] as num).toDouble()
+          : 0.0;
 
-    return query.orderBy('price', descending: false);
+      if (normalizedCategory.isNotEmpty && category != normalizedCategory) {
+        return false;
+      }
+
+      if (normalizedDistrict.isNotEmpty && district != normalizedDistrict) {
+        return false;
+      }
+
+      if (normalizedCity.isNotEmpty && city != normalizedCity) {
+        return false;
+      }
+
+      if (_minPrice != null && price < _minPrice!) {
+        return false;
+      }
+
+      if (_maxPrice != null && price > _maxPrice!) {
+        return false;
+      }
+
+      return true;
+    }).toList();
+
+    filtered.sort((a, b) {
+      final aPrice = (a.data()['price'] is num)
+          ? (a.data()['price'] as num).toDouble()
+          : 0;
+      final bPrice = (b.data()['price'] is num)
+          ? (b.data()['price'] as num).toDouble()
+          : 0;
+      return aPrice.compareTo(bPrice);
+    });
+
+    return filtered;
+  }
+
+  String _displayLocation(Map<String, dynamic> data) {
+    final city = (data['city'] ?? '').toString().trim();
+    final district = (data['district'] ?? '').toString().trim();
+    if (city.isNotEmpty || district.isNotEmpty) {
+      return '$city, $district';
+    }
+    return (data['location'] ?? '').toString();
   }
 
   @override
@@ -81,8 +136,10 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirestoreRefs.users().doc(user.uid).snapshots(),
       builder: (context, snapshot) {
-        final role = (snapshot.data?.data()?['role'] ?? UserRoles.seeker)
-            .toString();
+        final userData = snapshot.data?.data() ?? {};
+        final role = (userData['role'] ?? UserRoles.seeker).toString();
+        final userDistrict = (userData['district'] ?? '').toString().trim();
+        final userCity = (userData['city'] ?? '').toString().trim();
 
         return Column(
           children: [
@@ -103,14 +160,46 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: TextField(
-                          controller: _locationController,
+                          controller: _districtController,
                           decoration: const InputDecoration(
-                            labelText: 'City / District',
+                            labelText: 'District',
                           ),
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _cityController,
+                          decoration: const InputDecoration(labelText: 'City'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Near me'),
+                          value: _nearMe,
+                          onChanged: (value) {
+                            setState(() {
+                              _nearMe = value;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_nearMe && (userDistrict.isEmpty || userCity.isEmpty))
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Set your district and city in Profile to use Near me.',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -151,7 +240,12 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  final docs = snapshot.data?.docs ?? [];
+                  final docs = _applyClientFilters(
+                    snapshot.data?.docs ?? [],
+                    userDistrict: userDistrict,
+                    userCity: userCity,
+                  );
+
                   if (docs.isEmpty) {
                     return const Center(child: Text('No services found.'));
                   }
@@ -169,16 +263,15 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
                         child: ListTile(
                           title: Text(data['title'] ?? 'Service'),
                           subtitle: Text(
-                            '${data['category'] ?? ''} • ${data['location'] ?? ''} • LKR ${data['price'] ?? ''}',
+                            '${data['category'] ?? ''} | ${_displayLocation(data)} | LKR ${data['price'] ?? ''}',
                           ),
                           trailing: Text(
                             (data['status'] ?? 'pending').toString(),
                           ),
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => ServiceDetailScreen(
-                                serviceId: doc.id,
-                              ),
+                              builder: (_) =>
+                                  ServiceDetailScreen(serviceId: doc.id),
                             ),
                           ),
                         ),

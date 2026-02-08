@@ -1,13 +1,41 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../utils/firestore_refs.dart';
+import '../../utils/firestore_error_handler.dart';
 
 class AdminServicesScreen extends StatelessWidget {
   const AdminServicesScreen({super.key});
 
-  Future<void> _updateStatus(String serviceId, String status) async {
-    // TODO: Add proper error handling with BuildContext via callback or state management
-    await FirestoreRefs.services().doc(serviceId).update({'status': status});
+  Future<void> _updateStatus(
+    BuildContext context,
+    String serviceId,
+    String status,
+  ) async {
+    try {
+      await FirestoreRefs.services().doc(serviceId).update({'status': status});
+    } on FirebaseException catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'services_update_status',
+        error: e,
+        stackTrace: st,
+        details: {'serviceId': serviceId, 'status': status},
+      );
+      FirestoreErrorHandler.showError(
+        context,
+        FirestoreErrorHandler.toUserMessage(e),
+      );
+    } catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'services_update_status_unknown',
+        error: e,
+        stackTrace: st,
+        details: {'serviceId': serviceId, 'status': status},
+      );
+      FirestoreErrorHandler.showError(
+        context,
+        FirestoreErrorHandler.toUserMessage(e),
+      );
+    }
   }
 
   @override
@@ -40,11 +68,13 @@ class AdminServicesScreen extends StatelessWidget {
                   spacing: 8,
                   children: [
                     TextButton(
-                      onPressed: () => _updateStatus(doc.id, 'approved'),
+                      onPressed: () =>
+                          _updateStatus(context, doc.id, 'approved'),
                       child: const Text('Approve'),
                     ),
                     TextButton(
-                      onPressed: () => _updateStatus(doc.id, 'rejected'),
+                      onPressed: () =>
+                          _updateStatus(context, doc.id, 'rejected'),
                       child: const Text('Reject'),
                     ),
                   ],

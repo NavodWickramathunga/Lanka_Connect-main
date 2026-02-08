@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../utils/firestore_refs.dart';
+import '../../utils/firestore_error_handler.dart';
 import '../../utils/user_roles.dart';
 
 class ServiceDetailScreen extends StatelessWidget {
@@ -15,7 +16,10 @@ class ServiceDetailScreen extends StatelessWidget {
     String providerId,
   ) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      FirestoreErrorHandler.showSignInRequired(context);
+      return;
+    }
 
     try {
       await FirestoreRefs.bookings().add({
@@ -26,17 +30,39 @@ class ServiceDetailScreen extends StatelessWidget {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Booking request sent.')),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating booking: $e')),
-        );
-      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Booking request sent.')));
+    } on FirebaseException catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'bookings_add',
+        error: e,
+        stackTrace: st,
+        details: {
+          'uid': user.uid,
+          'serviceId': serviceId,
+          'providerId': providerId,
+        },
+      );
+      FirestoreErrorHandler.showError(
+        context,
+        FirestoreErrorHandler.toUserMessage(e),
+      );
+    } catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'bookings_add_unknown',
+        error: e,
+        stackTrace: st,
+        details: {
+          'uid': user.uid,
+          'serviceId': serviceId,
+          'providerId': providerId,
+        },
+      );
+      FirestoreErrorHandler.showError(
+        context,
+        FirestoreErrorHandler.toUserMessage(e),
+      );
     }
   }
 
@@ -46,7 +72,10 @@ class ServiceDetailScreen extends StatelessWidget {
     String providerId,
   ) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      FirestoreErrorHandler.showSignInRequired(context);
+      return;
+    }
 
     try {
       await FirestoreRefs.requests().add({
@@ -57,17 +86,39 @@ class ServiceDetailScreen extends StatelessWidget {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Service request created.')),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating request: $e')),
-        );
-      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Service request created.')));
+    } on FirebaseException catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'requests_add',
+        error: e,
+        stackTrace: st,
+        details: {
+          'uid': user.uid,
+          'serviceId': serviceId,
+          'providerId': providerId,
+        },
+      );
+      FirestoreErrorHandler.showError(
+        context,
+        FirestoreErrorHandler.toUserMessage(e),
+      );
+    } catch (e, st) {
+      FirestoreErrorHandler.logWriteError(
+        operation: 'requests_add_unknown',
+        error: e,
+        stackTrace: st,
+        details: {
+          'uid': user.uid,
+          'serviceId': serviceId,
+          'providerId': providerId,
+        },
+      );
+      FirestoreErrorHandler.showError(
+        context,
+        FirestoreErrorHandler.toUserMessage(e),
+      );
     }
   }
 
@@ -89,6 +140,11 @@ class ServiceDetailScreen extends StatelessWidget {
 
         final data = snapshot.data!.data() ?? {};
         final providerId = (data['providerId'] ?? '').toString();
+        final city = (data['city'] ?? '').toString().trim();
+        final district = (data['district'] ?? '').toString().trim();
+        final location = (city.isNotEmpty || district.isNotEmpty)
+            ? '$city, $district'
+            : (data['location'] ?? '').toString();
 
         return Scaffold(
           appBar: AppBar(title: Text(data['title'] ?? 'Service')),
@@ -102,7 +158,7 @@ class ServiceDetailScreen extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 6),
-                Text('Location: ${data['location'] ?? ''}'),
+                Text('Location: $location'),
                 Text('Price: LKR ${data['price'] ?? ''}'),
                 const SizedBox(height: 12),
                 Text(data['description'] ?? ''),
@@ -119,7 +175,8 @@ class ServiceDetailScreen extends StatelessWidget {
                     final ratings = reviews
                         .map((doc) => (doc.data()['rating'] ?? 0) as int)
                         .toList();
-                    final avg = ratings.fold<int>(0, (sum, item) => sum + item) /
+                    final avg =
+                        ratings.fold<int>(0, (sum, item) => sum + item) /
                         ratings.length;
                     return Text('Average rating: ${avg.toStringAsFixed(1)}');
                   },

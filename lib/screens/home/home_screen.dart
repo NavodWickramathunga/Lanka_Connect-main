@@ -26,6 +26,12 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  String _roleLabel(String role) {
+    if (role == UserRoles.provider) return 'Provider';
+    if (role == UserRoles.admin) return 'Admin';
+    return 'Seeker';
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -52,7 +58,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Lanka Connect'),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Lanka Connect'),
+                Text(
+                  '${_roleLabel(role)}${user.email != null ? ' | ${user.email}' : ''}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
             actions: [
               IconButton(
                 onPressed: () => FirebaseAuth.instance.signOut(),
