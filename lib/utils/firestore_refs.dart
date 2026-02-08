@@ -1,0 +1,23 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+class FirestoreRefs {
+  static final FirebaseFirestore db = FirebaseFirestore.instance;
+
+  static CollectionReference<Map<String, dynamic>> users() =>
+      db.collection('users');
+
+  static CollectionReference<Map<String, dynamic>> services() =>
+      db.collection('services');
+
+  static CollectionReference<Map<String, dynamic>> requests() =>
+      db.collection('requests');
+
+  static CollectionReference<Map<String, dynamic>> bookings() =>
+      db.collection('bookings');
+
+  static CollectionReference<Map<String, dynamic>> messages() =>
+      db.collection('messages');
+
+  static CollectionReference<Map<String, dynamic>> reviews() =>
+      db.collection('reviews');
+}
