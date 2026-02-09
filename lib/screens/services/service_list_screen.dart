@@ -57,7 +57,7 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
       query = query.where('status', isEqualTo: 'approved');
     }
 
-    return query.orderBy('createdAt', descending: true);
+    return query;
   }
 
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _applyClientFilters(
@@ -105,13 +105,11 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
     }).toList();
 
     filtered.sort((a, b) {
-      final aPrice = (a.data()['price'] is num)
-          ? (a.data()['price'] as num).toDouble()
-          : 0;
-      final bPrice = (b.data()['price'] is num)
-          ? (b.data()['price'] as num).toDouble()
-          : 0;
-      return aPrice.compareTo(bPrice);
+      final aTs = a.data()['createdAt'];
+      final bTs = b.data()['createdAt'];
+      final aMillis = aTs is Timestamp ? aTs.millisecondsSinceEpoch : 0;
+      final bMillis = bTs is Timestamp ? bTs.millisecondsSinceEpoch : 0;
+      return bMillis.compareTo(aMillis);
     });
 
     return filtered;
@@ -137,7 +135,7 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
       stream: FirestoreRefs.users().doc(user.uid).snapshots(),
       builder: (context, snapshot) {
         final userData = snapshot.data?.data() ?? {};
-        final role = (userData['role'] ?? UserRoles.seeker).toString();
+        final role = UserRoles.normalize(userData['role']);
         final userDistrict = (userData['district'] ?? '').toString().trim();
         final userCity = (userData['city'] ?? '').toString().trim();
 
@@ -238,6 +236,14 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        'Failed to load services: '
+                        '${snapshot.error}',
+                      ),
+                    );
                   }
 
                   final docs = _applyClientFilters(

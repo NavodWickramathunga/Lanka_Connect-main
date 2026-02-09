@@ -6,6 +6,7 @@ import '../../utils/user_roles.dart';
 import '../admin/admin_services_screen.dart';
 import '../bookings/booking_list_screen.dart';
 import '../chat/chat_list_screen.dart';
+import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 import '../services/service_list_screen.dart';
 import '../services/service_form_screen.dart';
@@ -36,9 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      return const Scaffold(
-        body: Center(child: Text('Not signed in')),
-      );
+      return const Scaffold(body: Center(child: Text('Not signed in')));
     }
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -50,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
         final data = snapshot.data?.data() ?? {};
-        final role = (data['role'] ?? UserRoles.seeker).toString();
+        final role = UserRoles.normalize(data['role']);
 
         final tabs = _tabsForRole(role);
         final items = _navItemsForRole(role);
@@ -70,6 +69,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
             actions: [
+              IconButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationsScreen(),
+                  ),
+                ),
+                icon: const Icon(Icons.notifications),
+              ),
               IconButton(
                 onPressed: () => FirebaseAuth.instance.signOut(),
                 icon: const Icon(Icons.logout),
@@ -126,60 +133,39 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: Icon(Icons.storefront),
           label: 'Services',
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person),
-          label: 'Profile',
-        ),
+        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
       ];
     }
 
     if (role == UserRoles.provider) {
       return const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.store),
-          label: 'My Services',
-        ),
+        BottomNavigationBarItem(icon: Icon(Icons.store), label: 'My Services'),
         BottomNavigationBarItem(
           icon: Icon(Icons.calendar_today),
           label: 'Bookings',
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.chat),
-          label: 'Chat',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person),
-          label: 'Profile',
-        ),
+        BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Chat'),
+        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
       ];
     }
 
     return const [
-      BottomNavigationBarItem(
-        icon: Icon(Icons.search),
-        label: 'Services',
-      ),
+      BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Services'),
       BottomNavigationBarItem(
         icon: Icon(Icons.calendar_today),
         label: 'Bookings',
       ),
-      BottomNavigationBarItem(
-        icon: Icon(Icons.chat),
-        label: 'Chat',
-      ),
-      BottomNavigationBarItem(
-        icon: Icon(Icons.person),
-        label: 'Profile',
-      ),
+      BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Chat'),
+      BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
     ];
   }
 
   FloatingActionButton? _fabForRole(String role, int index) {
     if (role == UserRoles.provider && index == 0) {
       return FloatingActionButton(
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const ServiceFormScreen()),
-        ),
+        onPressed: () => Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const ServiceFormScreen())),
         child: const Icon(Icons.add),
       );
     }

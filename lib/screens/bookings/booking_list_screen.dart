@@ -3,8 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../utils/firestore_refs.dart';
 import '../../utils/firestore_error_handler.dart';
+import '../../utils/notification_service.dart';
 import '../../utils/user_roles.dart';
 import '../chat/chat_screen.dart';
+import '../payments/payment_screen.dart';
 import '../reviews/review_form_screen.dart';
 
 class BookingListScreen extends StatelessWidget {
@@ -14,9 +16,17 @@ class BookingListScreen extends StatelessWidget {
     BuildContext context,
     String bookingId,
     String status,
+    String seekerId,
   ) async {
     try {
       await FirestoreRefs.bookings().doc(bookingId).update({'status': status});
+      await NotificationService.create(
+        recipientId: seekerId,
+        title: 'Booking status updated',
+        body: 'Your booking is now "$status".',
+        type: 'booking',
+        data: {'bookingId': bookingId, 'status': status},
+      );
     } on FirebaseException catch (e, st) {
       FirestoreErrorHandler.logWriteError(
         operation: 'bookings_update_status',
@@ -52,8 +62,7 @@ class BookingListScreen extends StatelessWidget {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirestoreRefs.users().doc(user.uid).snapshots(),
       builder: (context, snapshot) {
-        final role = (snapshot.data?.data()?['role'] ?? UserRoles.seeker)
-            .toString();
+        final role = UserRoles.normalize(snapshot.data?.data()?['role']);
 
         Query<Map<String, dynamic>> query = FirestoreRefs.bookings();
         if (role == UserRoles.provider) {
@@ -67,6 +76,13 @@ class BookingListScreen extends StatelessWidget {
           builder: (context, bookingSnapshot) {
             if (bookingSnapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
+            }
+            if (bookingSnapshot.hasError) {
+              return Center(
+                child: Text(
+                  FirestoreErrorHandler.toUserMessage(bookingSnapshot.error!),
+                ),
+              );
             }
 
             final docs = bookingSnapshot.data?.docs ?? [];
@@ -102,21 +118,43 @@ class BookingListScreen extends StatelessWidget {
                         ),
                         if (role == UserRoles.provider && status == 'pending')
                           TextButton(
-                            onPressed: () =>
-                                _updateStatus(context, doc.id, 'accepted'),
+                            onPressed: () => _updateStatus(
+                              context,
+                              doc.id,
+                              'accepted',
+                              (data['seekerId'] ?? '').toString(),
+                            ),
                             child: const Text('Accept'),
                           ),
                         if (role == UserRoles.provider && status == 'pending')
                           TextButton(
-                            onPressed: () =>
-                                _updateStatus(context, doc.id, 'rejected'),
+                            onPressed: () => _updateStatus(
+                              context,
+                              doc.id,
+                              'rejected',
+                              (data['seekerId'] ?? '').toString(),
+                            ),
                             child: const Text('Reject'),
                           ),
                         if (role == UserRoles.provider && status == 'accepted')
                           TextButton(
-                            onPressed: () =>
-                                _updateStatus(context, doc.id, 'completed'),
+                            onPressed: () => _updateStatus(
+                              context,
+                              doc.id,
+                              'completed',
+                              (data['seekerId'] ?? '').toString(),
+                            ),
                             child: const Text('Complete'),
+                          ),
+                        if (role == UserRoles.seeker && status == 'accepted')
+                          TextButton(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    PaymentScreen(bookingId: doc.id),
+                              ),
+                            ),
+                            child: const Text('Pay'),
                           ),
                         if (role == UserRoles.seeker && status == 'completed')
                           TextButton(

@@ -20,8 +20,7 @@ class ChatListScreen extends StatelessWidget {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirestoreRefs.users().doc(user.uid).snapshots(),
       builder: (context, snapshot) {
-        final role = (snapshot.data?.data()?['role'] ?? UserRoles.seeker)
-            .toString();
+        final role = UserRoles.normalize(snapshot.data?.data()?['role']);
 
         Query<Map<String, dynamic>> query = FirestoreRefs.bookings();
         if (role == UserRoles.provider) {

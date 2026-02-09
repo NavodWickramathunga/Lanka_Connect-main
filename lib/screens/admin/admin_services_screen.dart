@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../utils/firestore_refs.dart';
 import '../../utils/firestore_error_handler.dart';
+import '../../utils/notification_service.dart';
 
 class AdminServicesScreen extends StatelessWidget {
   const AdminServicesScreen({super.key});
@@ -10,9 +11,17 @@ class AdminServicesScreen extends StatelessWidget {
     BuildContext context,
     String serviceId,
     String status,
+    String providerId,
   ) async {
     try {
       await FirestoreRefs.services().doc(serviceId).update({'status': status});
+      await NotificationService.create(
+        recipientId: providerId,
+        title: 'Service moderation update',
+        body: 'Your service was marked as "$status".',
+        type: 'service_moderation',
+        data: {'serviceId': serviceId, 'status': status},
+      );
     } on FirebaseException catch (e, st) {
       FirestoreErrorHandler.logWriteError(
         operation: 'services_update_status',
@@ -68,13 +77,21 @@ class AdminServicesScreen extends StatelessWidget {
                   spacing: 8,
                   children: [
                     TextButton(
-                      onPressed: () =>
-                          _updateStatus(context, doc.id, 'approved'),
+                      onPressed: () => _updateStatus(
+                        context,
+                        doc.id,
+                        'approved',
+                        (data['providerId'] ?? '').toString(),
+                      ),
                       child: const Text('Approve'),
                     ),
                     TextButton(
-                      onPressed: () =>
-                          _updateStatus(context, doc.id, 'rejected'),
+                      onPressed: () => _updateStatus(
+                        context,
+                        doc.id,
+                        'rejected',
+                        (data['providerId'] ?? '').toString(),
+                      ),
                       child: const Text('Reject'),
                     ),
                   ],

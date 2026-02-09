@@ -88,7 +88,11 @@ service cloud.firestore {
     }
 
     match /bookings/{bookingId} {
-      allow read: if isBookingParticipant(bookingId) || isAdmin();
+      allow read: if signedIn() && (
+        resource.data.providerId == request.auth.uid ||
+        resource.data.seekerId == request.auth.uid ||
+        isAdmin()
+      );
 
       allow create: if signedIn()
         && request.resource.data.seekerId == request.auth.uid
@@ -166,6 +170,53 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.providerId == request.resource.data.providerId
         && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.serviceId == request.resource.data.serviceId
         && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.status == 'completed';
+
+      allow update, delete: if false;
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn() && (
+        resource.data.recipientId == request.auth.uid || isAdmin()
+      );
+
+      allow create: if signedIn()
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.recipientId is string
+        && request.resource.data.title is string
+        && request.resource.data.body is string;
+
+      allow update: if signedIn()
+        && resource.data.recipientId == request.auth.uid
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['isRead', 'readAt'])
+        && request.resource.data.isRead == true;
+
+      allow delete: if false;
+    }
+
+    match /payments/{paymentId} {
+      allow read: if signedIn() && (
+        resource.data.seekerId == request.auth.uid ||
+        resource.data.providerId == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow create: if signedIn()
+        && request.resource.data.seekerId == request.auth.uid
+        && request.resource.data.providerId is string
+        && request.resource.data.serviceId is string
+        && request.resource.data.bookingId is string
+        && request.resource.data.gateway == 'demo'
+        && request.resource.data.status in ['success', 'failed']
+        && (
+          request.resource.data.amount is int ||
+          request.resource.data.amount is float
+        )
+        && request.resource.data.amount >= 0
+        && exists(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId))
+        && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.seekerId == request.auth.uid
+        && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.providerId == request.resource.data.providerId
+        && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.serviceId == request.resource.data.serviceId
+        && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.status == 'accepted';
 
       allow update, delete: if false;
     }

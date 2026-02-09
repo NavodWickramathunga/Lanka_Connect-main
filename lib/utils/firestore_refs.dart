@@ -20,4 +20,10 @@ class FirestoreRefs {
 
   static CollectionReference<Map<String, dynamic>> reviews() =>
       db.collection('reviews');
+
+  static CollectionReference<Map<String, dynamic>> notifications() =>
+      db.collection('notifications');
+
+  static CollectionReference<Map<String, dynamic>> payments() =>
+      db.collection('payments');
 }

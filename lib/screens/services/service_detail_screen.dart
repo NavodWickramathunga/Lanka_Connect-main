@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../utils/firestore_refs.dart';
 import '../../utils/firestore_error_handler.dart';
+import '../../utils/notification_service.dart';
 import '../../utils/user_roles.dart';
 
 class ServiceDetailScreen extends StatelessWidget {
@@ -14,6 +15,8 @@ class ServiceDetailScreen extends StatelessWidget {
     BuildContext context,
     String serviceId,
     String providerId,
+    double amount,
+    String serviceTitle,
   ) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -26,9 +29,18 @@ class ServiceDetailScreen extends StatelessWidget {
         'serviceId': serviceId,
         'providerId': providerId,
         'seekerId': user.uid,
+        'amount': amount,
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
       });
+
+      await NotificationService.create(
+        recipientId: providerId,
+        title: 'New booking request',
+        body: 'A seeker requested booking for "$serviceTitle".',
+        type: 'booking',
+        data: {'serviceId': serviceId, 'seekerId': user.uid},
+      );
 
       ScaffoldMessenger.of(
         context,
@@ -70,6 +82,7 @@ class ServiceDetailScreen extends StatelessWidget {
     BuildContext context,
     String serviceId,
     String providerId,
+    String serviceTitle,
   ) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -85,6 +98,14 @@ class ServiceDetailScreen extends StatelessWidget {
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
       });
+
+      await NotificationService.create(
+        recipientId: providerId,
+        title: 'New service request',
+        body: 'A seeker created a request for "$serviceTitle".',
+        type: 'request',
+        data: {'serviceId': serviceId, 'seekerId': user.uid},
+      );
 
       ScaffoldMessenger.of(
         context,
@@ -185,9 +206,9 @@ class ServiceDetailScreen extends StatelessWidget {
                 StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                   stream: FirestoreRefs.users().doc(user.uid).snapshots(),
                   builder: (context, roleSnapshot) {
-                    final role =
-                        (roleSnapshot.data?.data()?['role'] ?? UserRoles.seeker)
-                            .toString();
+                    final role = UserRoles.normalize(
+                      roleSnapshot.data?.data()?['role'],
+                    );
 
                     if (role == UserRoles.provider) {
                       return const SizedBox.shrink();
@@ -197,14 +218,25 @@ class ServiceDetailScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         ElevatedButton(
-                          onPressed: () =>
-                              _createBooking(context, serviceId, providerId),
+                          onPressed: () => _createBooking(
+                            context,
+                            serviceId,
+                            providerId,
+                            (data['price'] is num)
+                                ? (data['price'] as num).toDouble()
+                                : 0.0,
+                            (data['title'] ?? 'service').toString(),
+                          ),
                           child: const Text('Book Service'),
                         ),
                         const SizedBox(height: 8),
                         OutlinedButton(
-                          onPressed: () =>
-                              _createRequest(context, serviceId, providerId),
+                          onPressed: () => _createRequest(
+                            context,
+                            serviceId,
+                            providerId,
+                            (data['title'] ?? 'service').toString(),
+                          ),
                           child: const Text('Create Request'),
                         ),
                       ],
